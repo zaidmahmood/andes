@@ -3,7 +3,7 @@ Inertia estimation model based on swing equation with constant Pm
  
 """
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
-from andes.core.block import  Piecewise
+from andes.core.block import  Piecewise, Washout
 
 
 class InertiaEstimationConstantPm(ModelData, Model):
@@ -109,6 +109,15 @@ class InertiaEstimationConstantPm(ModelData, Model):
                            tex_name = 'Pe',
                            export = True
                            )
+
+        #washout to find omegadoubledot
+        self.omegawashout = NumParam(default=0.1,
+                           info="Time Constant for omega washout",
+                           unit="sec",
+                           tex_name='washout constant',
+                           )
+        self.omegadoubledot = Washout(u = self.omega_dot, K = 1,
+                            T = self.omegawashout)   
 
         self.Pm = ConstService(v_str='Pe', info='initial Pe',
                                       tex_name='P_{m}',
