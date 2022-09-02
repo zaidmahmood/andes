@@ -118,6 +118,8 @@ class InertiaEstimationConstantPm(ModelData, Model):
                            )
         self.omegadoubledot = Washout(u = self.omega_dot, K = 1,
                             T = self.omegawashout)   
+        
+        
 
         self.Pm = ConstService(v_str='Pe', info='initial Pe',
                                       tex_name='P_{m}',
@@ -126,7 +128,7 @@ class InertiaEstimationConstantPm(ModelData, Model):
                            e_str = '(Pm - Pe) - pdiff'
                            )
         #main blocks
-        self.piece = Piecewise(u = self.omega_dot, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
+        self.piece = Piecewise(u = self.omegadoubledot_y, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
                                name = 'piece')    
         self.M_star = State(v_str = 'piece_y * ( M_star * omega_dot + (Pe - Pm))',
                             e_str = 'piece_y * ( M_star * omega_dot + (Pe - Pm))',
