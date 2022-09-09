@@ -3,7 +3,8 @@ Inertia estimation model based on swing equation with constant Pm
  
 """
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
-from andes.core.block import  Piecewise, Washout
+from andes.core.block import  Lag, Piecewise, Washout, Gain, Integrator
+from andes.core.discrete import Limiter
 
 
 class InertiaEstimationConstantPm(ModelData, Model):
@@ -33,6 +34,11 @@ class InertiaEstimationConstantPm(ModelData, Model):
                            )
         self.negepsilon = ConstService(v_str = '-1 * epsilon')
         self.Tm = NumParam(default=0.01,
+                           info="Time Constant",
+                           unit="sec",
+                           tex_name='T_m',
+                           )
+        self.Tsignal = NumParam(default=0.01,
                            info="Time Constant",
                            unit="sec",
                            tex_name='T_m',
@@ -127,8 +133,23 @@ class InertiaEstimationConstantPm(ModelData, Model):
         self.pdiff = Algeb(v_str = '(Pm - Pe)',
                            e_str = '(Pm - Pe) - pdiff'
                            )
+        #self.signal = Lag(u = self.omegadoubledot_y,
+        #                  K = 1, T = self.Tsignal)
+        ## Liu Blocks ############################################################################################################
+        self.k_omega = Gain(u = "omega_dot - omegadot_star_y", 
+                            K = self.Kp
+                            )        
+        self.omegadot_star = Integrator(u = self.k_omega_y, T = 1, K = self.Ki, 
+                                        y0 = '0', check_init = False
+                                        )
+        self.omegadoubledotliu = Lag(u = "k_omega_y - omegadoubledotliu_y",
+                                  K = 1, T = self.Tf
+                                  )        
+        self.signal = Lag(u = self.omegadoubledotliu_y,
+                          K = 0.0001, T = self.Tsignal)
+        #########################################################################################################################
         #main blocks
-        self.piece = Piecewise(u = self.omegadoubledot_y, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
+        self.piece = Piecewise(u = self.signal_y, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
                                name = 'piece')    
         self.M_star = State(v_str = 'piece_y * ( M_star * omega_dot + (Pe - Pm))',
                             e_str = 'piece_y * ( M_star * omega_dot + (Pe - Pm))',
