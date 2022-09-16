@@ -130,7 +130,7 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
         #main blocks
         self.piece = Piecewise(u = self.omega_dot, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
                                name = 'piece')    
-        self.M_star = State(v_str = 'piece_y * ( M_star * omega_dot - (Pm - Pe))',
+        self.M_star = State(v_str = '0',
                             e_str = 'piece_y * ( M_star * omega_dot - (Pm - Pe))',
                             t_const= self.Tm,
                             info = "Estimated Inertia"
