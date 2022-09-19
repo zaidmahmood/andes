@@ -2,7 +2,7 @@
 Inertia estimation model based on swing equation with constant Pm
  
 """
-from andes.core.service import ExtService
+from andes.core.service import ExtService, PostInitService
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
 from andes.core.block import  Piecewise
 
@@ -105,7 +105,7 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                           )
                 
         self.omega_dot = Algeb(tex_name = r'\dot \omega', info = r'\dot \omega',
-                              v_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg',
+                              v_str = '0', #CHECK THIS BEFORE PUSHING
                               e_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg - omega_dot'
                               )
         
@@ -115,16 +115,19 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                            tex_name = 'Pe',
                            export = True
                            )
-        self.Pe0 = ExtService(src='Pe',
-                           model='REGCA1',
-                           indexer=self.res,
-                           tex_name = 'Pe'
+        self.PeAlgeb = Algeb(v_str = 'Pe',
+                           e_str = 'Pe-PeAlgeb'
                            )
 
-        self.Pm = ConstService(v_str='Pe0', info='initial Pe',
-                                      tex_name='P_{m}',
-                                      )
-        
+        self.Pm = PostInitService(info='Initial Pe',
+                             tex_name='P_{e0}', v_str='PeAlgeb' )
+        #self.Pm = ConstService(v_str='Pe', info='initial Pe',
+        #                       tex_name='P_{m}',
+        #                       )
+        self.pdiff = Algeb(v_str = '(Pm - Pe)',
+                           e_str = '(Pm - Pe) - pdiff'
+                           )
+        #PmTest = Pm
         self.PmTest = Algeb(v_str = 'Pm',
                             e_str = 'Pm - PmTest')
         #main blocks

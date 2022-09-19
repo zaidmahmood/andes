@@ -100,7 +100,7 @@ class InertiaEstimationVariablePm(ModelData, Model):
                           )
                 
         self.omega_dot = Algeb(tex_name = r'\dot \omega', info = r'\dot \omega',
-                              v_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg',
+                              v_str = '0', #CHECK THIS BEFORE PUSHING
                               e_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg - omega_dot'
                               )
         
