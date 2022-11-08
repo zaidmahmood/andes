@@ -9,6 +9,31 @@ The APIs before v3.0.0 are in beta and may change without prior notice.
 v1.8 Notes
 ==========
 
+v1.8.3 (2022-11-15)
+-------------------
+- Support Python 3.11. The average performance gain is a few percent.
+- Made ``numba`` an optional dependency because it does not yet support Python
+  3.11.
+
+v1.8.2 (2022-10-30)
+-------------------
+This is a minor release to support SymPy 1.11.x.
+
+Internally, ``ModelData`` contains a new member field ``index_bases`` to record
+the variables by which other variables are indexed. Most variables, by default,
+are indexed by ``idx``. Some models (such as COI) whose device can link to
+multiple other devices can have multiple index bases.
+
+Index bases are currently placeholders and have not been used in the current
+version.
+
+v1.8.1 (2022-09-24)
+-------------------
+
+- New turbine governor model :ref:`HYGOV4`. Thanks to Zaid Mahmood for the
+  contribution.
+- Bug fixes to saving data to xlsx file.
+
 v1.8.0 (2022-08-30)
 -------------------
 
