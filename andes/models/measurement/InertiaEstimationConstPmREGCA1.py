@@ -4,7 +4,7 @@ Inertia estimation model based on swing equation with constant Pm
 """
 from andes.core.service import ExtService, PostInitService
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
-from andes.core.block import  Piecewise
+from andes.core.block import  DeadBand1, Piecewise, Gain, Integrator, Lag
 
 
 class InertiaEstimationConstPmREGCA1(ModelData, Model):
@@ -104,8 +104,8 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                           export = True
                           )
                 
-        self.omega_dot = Algeb(tex_name = r'\dot \omega', info = r'\dot \omega',
-                              v_str = '0', #CHECK THIS BEFORE PUSHING
+        self.omega_dot = Algeb(tex_name = r'\dot{\omega}', info = r'\dot{\omega}',
+                              v_str = '0', 
                               e_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg - omega_dot'
                               )
         
@@ -119,22 +119,57 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                            e_str = 'Pe-PeAlgeb'
                            )
 
-        self.Pm = PostInitService(info='Initial Pe',
-                             tex_name='P_{e0}', v_str='PeAlgeb' )
-        #self.Pm = ConstService(v_str='Pe', info='initial Pe',
-        #                       tex_name='P_{m}',
-        #                       )
-        self.pdiff = Algeb(v_str = '(Pm - Pe)',
-                           e_str = '(Pm - Pe) - pdiff'
+        #self.Pm = PostInitService(info='Initial Pe',
+        #                     tex_name='P_{e0}', v_str='PeAlgeb' )
+        self.Pm = ConstService(v_str='Pe', info='initial Pe',
+                               tex_name='P_{m}',
+                               )
+        
+        self.pdiff = Algeb(v_str = '0',
+                           e_str = '(Pe - Pm) - pdiff',
+                           tex_name = 'P_{diff}'
                            )
         #PmTest = Pm
-        self.PmTest = Algeb(v_str = 'Pm',
+        self.PmTest = Algeb(v_str = 'Pe',
                             e_str = 'Pm - PmTest')
+        self.windowswitch = NumParam(default = 1,
+                                    info = 'Switch to control the window of ON period')
+        ## Liu Blocks ############################################################################################################
+        
+        self.Tsignal = NumParam(default=0.01,
+                           info="Time Constant",
+                           unit="sec",
+                           tex_name='T_m',
+                           )
+        self.k_omega = Gain(u = "omega_dot - omegadot_star_y", 
+                            K = self.Kp
+                            )        
+        self.omegadot_star = Integrator(u = self.k_omega_y, T = 1, K = self.Ki, 
+                                        y0 = '0', check_init = False
+                                        )
+        self.omegadoubledotliu = Lag(u = "k_omega_y - omegadoubledotliu_y",
+                                  K = 1, T = self.Tf
+                                  )        
+        self.signal = Lag(u = self.omegadoubledotliu_y,
+                          K = 0.001, T = self.Tsignal)
+        #########################################################################################################################
         #main blocks
-        self.piece = Piecewise(u = self.omega_dot, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
-                               name = 'piece')    
+        #self.condition = Algeb(v_str = 'M_star * omega_dot + pdiff',
+        #                    e_str = 'M_star * omega_dot + pdiff - condition')
+
+        #self.piececondition = Piecewise(u = self.condition , points= [-0.0000001, +0.00000010], funs= [1, 0, -1],    
+        #                       name = 'piececondition')
+        self.peak = Piecewise(u = self.signal_y, points= ['negepsilon', 'epsilon'], funs= [1, 0, 1], 
+                               name = 'peak')
+        
+        self.sign = Piecewise(u = self.omega_dot, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
+                               name = 'sign') 
+        #self.pdiffswitch = Piecewise(u = self.pdiff, points= [-.0001, 0.0001], funs= [1, 0, 1], 
+        #                       ) 
+ 
         self.M_star = State(v_str = '0',
-                            e_str = 'piece_y * ( M_star * omega_dot - (Pm - Pe))',
+                            e_str = 'windowswitch  * sign_y * (M_star*omega_dot+(Pe-Pm))',
                             t_const= self.Tm,
-                            info = "Estimated Inertia"
+                            info = "Estimated Inertia",
+                            tex_name= 'M^{*}'
                             )
