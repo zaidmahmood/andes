@@ -4,7 +4,7 @@ Inertia estimation model based on swing equation with constant Pm
 """
 from andes.core.service import ExtService, PostInitService
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
-from andes.core.block import  DeadBand1, Piecewise, Gain, Integrator, Lag
+from andes.core.block import  DeadBand1, Piecewise, Gain, Integrator, Lag, Washout
 
 
 class InertiaEstimationConstPmREGCA1(ModelData, Model):
@@ -72,11 +72,10 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                                 tex_name = 'damping',
                                 export = True
                                 )
-        self.Mg = ExtParam(src='M',
+        self.Mg = ExtService(src='M',
                             model='SynGen',
                             indexer=self.syn,
-                            tex_name = 'generator inertia',
-                            export = True
+                            tex_name = 'generator inertia'
                             )
         self.ug = ExtParam(src='u',
                            model='SynGen',
@@ -173,3 +172,18 @@ class InertiaEstimationConstPmREGCA1(ModelData, Model):
                             info = "Estimated Inertia",
                             tex_name= 'M^{*}'
                             )
+        self.T_mlag = NumParam(default=0.1,
+                           info="Time Constant for M Lag Filter",
+                           unit="sec",
+                           tex_name='Lag time constant',
+                           )
+        self.D_mlag = NumParam(default=1,
+                           info="D Constant for M Lag Filter",
+                           tex_name='Lag D constant',
+                           )
+        self.K_mlag = NumParam(default=1,
+                           info="Gain Constant for M Lag Filter",
+                           tex_name='Lag Gain constant',
+                           )
+        self.M_lag = Lag(u = self.M_star, K = self.K_mlag, D = self.D_mlag,
+                            T = self.T_mlag)  
