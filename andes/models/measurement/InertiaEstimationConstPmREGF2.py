@@ -5,7 +5,7 @@ Inertia estimation model based on swing equation with constant Pm
 from andes.core.service import ExtService, PostInitService
 from andes.core import ConstService, NumParam, ModelData, Model, IdxParam, ExtState, State, ExtAlgeb, ExtParam, Algeb
 from andes.core.block import  DeadBand1, Piecewise, Gain, Integrator, Lag, Washout
-
+from andes.core.discrete import Derivative
 
 class InertiaEstimationConstPmREGF2(ModelData, Model):
     """
@@ -107,7 +107,15 @@ class InertiaEstimationConstPmREGF2(ModelData, Model):
                               v_str = '0', 
                               e_str = 'ug * (-1 * damping * (omega - 1) - te + tm) / Mg - omega_dot'
                               )
-        
+        self.omega_alg = Algeb(v_str = 'omega',
+                               e_str = 'omega - omega_alg'
+                               )
+        self.omega_fd = Derivative(u = self.omega_alg)
+
+        self.omega_finite = Algeb(v_str = 'omega_fd_v',
+                               e_str = 'omega_fd_v - omega_finite'
+                               )
+
         self.Pe = ExtAlgeb(src='Pe',
                            model='REGF2',
                            indexer=self.res,
@@ -140,7 +148,7 @@ class InertiaEstimationConstPmREGF2(ModelData, Model):
                            unit="sec",
                            tex_name='T_m',
                            )
-        self.k_omega = Gain(u = "omega_dot - omegadot_star_y", 
+        self.k_omega = Gain(u = "omega_finite - omegadot_star_y", 
                             K = self.Kp
                             )        
         self.omegadot_star = Integrator(u = self.k_omega_y, T = 1, K = self.Ki, 
@@ -161,13 +169,13 @@ class InertiaEstimationConstPmREGF2(ModelData, Model):
         self.peak = Piecewise(u = self.signal_y, points= ['negepsilon', 'epsilon'], funs= [1, 0, 1], 
                                name = 'peak')
         
-        self.sign = Piecewise(u = self.omega_dot, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
+        self.sign = Piecewise(u = self.omega_finite, points= ['negepsilon', 'epsilon'], funs= [1, 0, -1], 
                                name = 'sign') 
         #self.pdiffswitch = Piecewise(u = self.pdiff, points= [-.0001, 0.0001], funs= [1, 0, 1], 
         #                       ) 
  
         self.M_star = State(v_str = '0',
-                            e_str = 'windowswitch  * sign_y * (M_star*omega_dot+(Pe-Pm))',
+                            e_str = 'windowswitch  * sign_y * (M_star*omega_finite+(Pe-Pm))',
                             t_const= self.Tm,
                             info = "Estimated Inertia",
                             tex_name= 'M^{*}'
