@@ -245,7 +245,7 @@ class Fault(ModelData, Model):
 
 class AlterData(ModelData):
     """
-    Data for Alter, which altera values of the given device at a certain time.
+    Data for Alter, which alters values of the given device at a certain time.
 
     Alter can be used in various timed applications, such as applying load changing,
     tap changing, step response, etc.
