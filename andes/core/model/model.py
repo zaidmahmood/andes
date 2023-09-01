@@ -502,8 +502,19 @@ class Model:
         bool
             True when successful.
         """
+
         uid = self.idx2uid(idx)
-        self.__dict__[src].__dict__[attr][uid] = value
+        instance = self.__dict__[src]
+
+        instance.__dict__[attr][uid] = value
+
+        # update differential equations' time constants stored in `dae.Tf`
+
+        if attr == "v":
+            for state in self.states.values():
+                if (state.t_const is instance) and len(state.a) > 0:
+                    self.system.dae.Tf[state.a[uid]] = instance.v[uid]
+
         return True
 
     def alter(self, src, idx, value):
@@ -511,12 +522,12 @@ class Model:
         Alter values of input parameters or constant service.
 
         If the method operates on an input parameter, the new data should be in
-        the same base as that in the input file. This function will convert the
-        new value to per unit in the system base.
+        the same base as that in the input file. This function will convert
+        ``value`` to per unit in the system base whenever necessary.
 
-        The values for storing the input data, i.e., the ``vin`` field of the
-        parameter, will be overwritten, thus the update will be reflected in the
-        dumped case file.
+        The values for storing the input data, i.e., the parameter's ``vin``
+        field, will be overwritten. As a result, altered values will be
+        reflected in the dumped case file.
 
         Parameters
         ----------
@@ -527,11 +538,14 @@ class Model:
         value : float
             The desired value
         """
+
         instance = self.__dict__[src]
 
         if hasattr(instance, 'vin') and (instance.vin is not None):
             self.set(src, idx, 'vin', value)
-            instance.v[:] = instance.vin * instance.pu_coeff
+
+            uid = self.idx2uid(idx)
+            self.set(src, idx, 'v', value * instance.pu_coeff[uid])
         else:
             self.set(src, idx, 'v', value)
 
@@ -621,7 +635,7 @@ class Model:
         Use mock data to fill the inputs.
 
         This function is used to generate input data of the desired type
-        to trigget JIT compilation.
+        to trigger JIT compilation.
         """
 
         self.get_inputs()
@@ -728,13 +742,15 @@ class Model:
                     # NOTE:
                     # Use new assignment due to possible size change.
                     # Always make a copy and make the RHS a 1-d array
-                    instance.v = np.ravel(np.array(func(*self.s_args[name]), dtype=instance.vtype))
+                    instance.v = np.array(func(*self.s_args[name]),
+                                          dtype=instance.vtype).ravel()
                 else:
-                    instance.v = np.ravel(np.array(func, dtype=instance.vtype))
+                    instance.v = np.array(func, dtype=instance.vtype).ravel()
 
                 # convert to an array if the return of lambda function is a scalar
                 if isinstance(instance.v, (int, float)):
                     instance.v = np.ones(self.n, dtype=instance.vtype) * instance.v
+
                 elif isinstance(instance.v, np.ndarray) and len(instance.v) == 1:
                     instance.v = np.ones(self.n, dtype=instance.vtype) * instance.v
 
@@ -1331,7 +1347,7 @@ class Model:
             for item in self.services_icheck.values():
                 item.check()
 
-    def numba_jitify(self, parallel=False, cache=True, nopython=False):
+    def numba_jitify(self, parallel=False, cache=True, nopython=True):
         """
         Convert equation residual calls, Jacobian calls, and variable service
         calls into JIT compiled functions.
@@ -1676,7 +1692,7 @@ def _eval_discrete(instance, allow_adjust=True,
 def to_jit(func: Union[Callable, None],
            parallel: bool = False,
            cache: bool = False,
-           nopython: bool = False,
+           nopython: bool = True,
            ):
     """
     Helper function for converting a function to a numba jit-compiled function.

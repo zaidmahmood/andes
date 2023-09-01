@@ -31,14 +31,14 @@ def require_pandapower(f):
 
 def build_group_table(ssa, group, columns, mdl_name=[]):
     """
-    Build the table for devices in a group in an ADNES System.
+    Build the table for devices in a group in an ANDES System.
 
     Parameters
     ----------
     ssa : andes.system.System
-        The ADNES system to build the table
+        The ANDES system to build the table
     group : string
-        The ADNES group
+        The ANDES group
     columns : list of string
         The common columns of a group that to be included in the table.
     mdl_name : list of string
@@ -66,13 +66,13 @@ def build_group_table(ssa, group, columns, mdl_name=[]):
 
 def make_link_table(ssa):
     """
-    Build the link table for generators and generator controllers in an ADNES
+    Build the link table for generators and generator controllers in an ANDES
     System, including ``SynGen`` and ``DG`` for now.
 
     Parameters
     ----------
     ssa : andes.system.System
-        The ADNES system to link
+        The ANDES system to link
 
     Returns
     -------
@@ -150,7 +150,7 @@ def runopp_map(ssp, link_table, **kwargs):
         The pandapower network
 
     link_table : DataFrame
-        The link table of ADNES system
+        The link table of ANDES system
 
     Returns
     -------
@@ -169,9 +169,10 @@ def runopp_map(ssp, link_table, **kwargs):
 
     try:
         pp.runopp(ssp, **kwargs)
+        logger.warning("ACOPF is solved.")
     except Exception:
         pp.rundcopp(ssp, **kwargs)
-        logger.warning("ACOPF failed, DCOPF is used instead.")
+        logger.warning("ACOPF failed. DCOPF is solved.")
 
     # take dispatch results from pp
     ssp_gen = ssp.gen.rename(columns={'name': 'stg_idx'})
@@ -444,12 +445,12 @@ def _to_pp_gen(ssa, ssp, ctrl=[]):
 @require_pandapower
 def to_pandapower(ssa, ctrl=[], verify=True, tol=1e-6):
     """
-    Convert an ADNES system to a pandapower network for power flow studies.
+    Convert an ANDES system to a pandapower network for power flow studies.
 
     Parameters
     ----------
     ssa : andes.system.System
-        The ADNES system to be converted
+        The ANDES system to be converted
     ctrl : list
         The controlability of generators. The length should be the same with the
         number of ``StaticGen``.
@@ -470,7 +471,14 @@ def to_pandapower(ssa, ctrl=[], verify=True, tol=1e-6):
     Notes
     -----
     Handling of the following parameters:
-
+      - This interface tracks static power flow model in ANDES: `Bus`, `Line`, `PQ`, `Shunt`, `PV`, and `Slack`.
+        However, it does not track the dynamic models in ANDES, including but not limited to
+        `TurbineGov`, `SynGen`, and `Exciter`.
+      - The interface converts the ``Slack`` in ANDES to ``gen`` in pandapower rather than ``ext_gen``.
+      - MUST NOT verify power flow after initializing TDS in ANDES. ANDES does not allow running ``PFlow``
+        for systems with initialized TDS as it will break variable addressing.
+      - If you want to track dynamic model outputs in ANDES and feedback into pandapower,
+        you might need to manually transfer the results from ANDES to pandapower.
       - Generator cost is not included in the conversion. Use ``add_gencost()``
         to add cost data.
       - By default, all generators in ``ssp`` are controllable unless user-defined controllability
@@ -513,8 +521,26 @@ def to_pandapower(ssa, ctrl=[], verify=True, tol=1e-6):
 
 def _verify_pf(ssa, ssp, tol=1e-6):
     """
-    Verify power flow results.
+    Verify power flow results between ANDES and pandapower.
+
+    Parameters
+    ----------
+    tol : float
+        The tolerance of error.
+
+    Returns
+    -------
+    True
+        If the difference between the two results is within the tolerance
+    False
+        If the difference is larger than the tolerance, OR time-domain
+        simulation has been run in the ANDES system. ANDES is not able to run
+        power flow after initializing time-domain simulation.
     """
+
+    if ssa.TDS.initialized:
+        return False
+
     ssa.PFlow.run()
     pp.runpp(ssp)
 
@@ -540,7 +566,7 @@ def _verify_pf(ssa, ssp, tol=1e-6):
         logger.info("Power flow results are consistent. Conversion is successful.")
         return True
     else:
-        logger.warning("Warning: Power flow results are inconsistent. Pleaes check!")
+        logger.warning("Warning: Power flow results are inconsistent. Please check!")
         return False
 
 

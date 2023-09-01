@@ -9,9 +9,46 @@ The APIs before v3.0.0 are in beta and may change without prior notice.
 v1.8 Notes
 ==========
 
-v1.8.5 (2022-12-xx)
+v1.8.10 (2023-08-10)
+--------------------
+- An internal change to the xlsx parser option. Previously, the index column was
+  set to 0, which assumes the existence of `uid` as the header. Manually input
+  sheets without `uid` will fail. This version unsets the index column when
+  using pandas to parse the xlsx file.
+- `Jumper` is included for connectivity check.
+- Add curly brackets for LaTeX symbols from sub-blocks. Nested symbols with
+  subscripts and superscripts now display properly.
+
+v1.8.9 (2023-06-22)
+-------------------
+- Fix `Model.alter()` for parameters that are time constants for differential
+  equations. Altered time constants are now properly updated in ``dae.Tf`` and
+  will be correctly reflected in simulation results.
+- Fix a bug in connectivity check.
+- Support numba for Python 3.11.
+
+v1.8.8 (2023-04-24)
+-------------------
+- Repository transferred to `github.com/curent/andes`.
+- Fix for frequency-dependent load model ``FLoad`` by not exporting the external
+  `bus` parameter.
+
+v1.8.7 (2023-03-10)
+-------------------
+- Added IEEE 39-bus test case with dynamics in the ANDES xlsx format.
+  Contributed by @jinningwang.
+- In `interop.pandapower`, the `_verify_pf` function will not be called if TDS
+  has been initialized. This prevents the breaking of variable addresses.
+
+v1.8.6 (2023-02-13)
+-------------------
+- Minor fix in `timeseries.py` for backward compatibility with Python 3.6.
+
+v1.8.5 (2022-12-22)
 -------------------
 - Fixed an issue to properly handle turning off a ``Jumper``.
+- New interface to GridCal by @JosepFanals. GridCal installation required.
+- Bug fixes in WTARA1.
 
 v1.8.4 (2022-11-23)
 -------------------

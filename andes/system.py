@@ -143,7 +143,7 @@ class System:
                                      ('dime_address', 'ipc:///tmp/dime2'),
                                      ('numba', 0),
                                      ('numba_parallel', 0),
-                                     ('numba_nopython', 0),
+                                     ('numba_nopython', 1),
                                      ('yapf_pycode', 0),
                                      ('save_stats', 0),
                                      ('np_divide', 'warn'),
@@ -549,6 +549,9 @@ class System:
         if kwargs is not None:
             param_dict.update(kwargs)
 
+        # remove `uid` field
+        param_dict.pop('uid', None)
+
         idx = param_dict.pop('idx', None)
         if idx is not None and (not isinstance(idx, str) and np.isnan(idx)):
             idx = None
@@ -824,7 +827,7 @@ class System:
 
         self.s_update_post(models)
 
-        # store the inverse of time constants
+        # store time constants associated with differential equations
         self._store_tf(models)
 
     def store_adder_setter(self, models):
@@ -1221,6 +1224,11 @@ class System:
         to.extend(self.Line.a2.a.tolist())
         u.extend(self.Line.u.v.tolist())
 
+        # collect from Jumper
+        fr.extend(self.Jumper.a1.a.tolist())
+        to.extend(self.Jumper.a2.a.tolist())
+        u.extend(self.Jumper.u.v.tolist())
+
         # collect from Fortescue
         fr.extend(self.Fortescue.a.a.tolist())
         to.extend(self.Fortescue.aa.a.tolist())
@@ -1255,6 +1263,7 @@ class System:
                         to + fr + fr + to,
                         (n, n),
                         'd')
+        temp = sparse(temp)  # need to drop allocated zero values
 
         cons = temp[0, :]
         nelm = len(cons.J)
@@ -1769,7 +1778,7 @@ class System:
 
     def import_groups(self):
         """
-        Import all groups classes defined in ``devices/group.py``.
+        Import all groups classes defined in ``models/group.py``.
 
         Groups will be stored as instances with the name as class names.
         All groups will be stored to dictionary ``System.groups``.
@@ -1824,7 +1833,7 @@ class System:
         Import routines as defined in ``routines/__init__.py``.
 
         Routines will be stored as instances with the name as class names.
-        All groups will be stored to dictionary ``System.groups``.
+        All routines will be stored to dictionary ``System.routines``.
 
         Examples
         --------
