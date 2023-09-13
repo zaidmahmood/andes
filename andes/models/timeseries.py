@@ -9,6 +9,7 @@ from collections import OrderedDict
 
 from andes.core.model import ModelData, Model  # noaq
 from andes.core.param import DataParam, IdxParam, NumParam  # noqa
+from andes.core import State, Algeb  # noqa
 from andes.core.discrete import Switcher
 from andes.shared import pd, np, tqdm
 
@@ -19,6 +20,7 @@ def str_list_iconv(x):
     """
     Helper function to convert a string or a list of strings into a numpy array.
     """
+
     if isinstance(x, str):
         x = x.split(',')
         x = [item.strip() for item in x]
@@ -32,6 +34,7 @@ def str_list_oconv(x):
     """
     Convert list into a list literal.
     """
+
     return ','.join(x)
 
 
@@ -69,6 +72,7 @@ class TimeSeriesData(ModelData):
                               oconvert=str_list_oconv,
                               vtype=object,
                               )
+        
 
 
 class TimeSeriesModel(Model):
@@ -84,20 +88,22 @@ class TimeSeriesModel(Model):
         self.group = 'DataSeries'
         self.flags.tds = True
 
-        self.config.add(OrderedDict((('silent', 1),
+        self.config.add(OrderedDict((('silent', 1), ('silent', 2)
                                      )))
 
         self.config.add_extra("_help",
                               silent="suppress output messages if is not zero",
                               )
         self.config.add_extra("_alt",
-                              silent=(0, 1),
+                              silent=(0,1, 2),
                               )
 
         self.SW = Switcher(self.mode, options=(0, 1, 2),
                            info='mode switcher', )
 
         self._data = OrderedDict()  # keys are the idx, and values are the dataframe
+        self.timeseriesvalues  = OrderedDict() 
+        
 
     def list2array(self):
         """
@@ -169,11 +175,15 @@ class TimeSeriesModel(Model):
         Gather simulation stop-at times for mode = 1.
         """
 
+
         Model.get_times(self)
 
         # collect all time stamps
         out = list()
 
+        print('time = ', self.system.dae.t)
+
+        #For mode == 1 
         for ii in range(self.n):
             if self.SW.s1[ii] != 1:
                 continue
@@ -183,6 +193,13 @@ class TimeSeriesModel(Model):
             tkey = self.tkey.v[ii]
 
             out.append(df[tkey].to_numpy())
+        
+        #For mode == 2 
+        for ii in range(self.n):
+            if self.SW.s2[ii] != 1:
+                continue
+        
+            out.append(self.system.dae.t)
 
         return out
 
@@ -196,6 +213,7 @@ class TimeSeriesModel(Model):
             the current time
         """
         # convert from numpy scalar to float
+
         t = t.tolist()
 
         for ii in range(self.n):
@@ -232,13 +250,103 @@ class TimeSeriesModel(Model):
                 if not self.config.silent:
                     tqdm.write("<TimeSeries %s> set %s=%g for %s.%s at t=%g" %
                                (idx, dest, value, model, dev_idx, t))
+            
+            self.timeseriesvalues[t] = value 
 
-    def apply_interpolate(self, t):
+            #self.value = value
+            
+            #self.timeseriesvalue = Algeb(v_str = '0',
+            #                             e_str = 'timeseriesvalue - value') ##############################################
+    
+    def apply_interpolate(self, t, call_counter = [0], interpolation_counter = [0]):
         """
         Apply timeseries data at the interpolated time.
-        """
 
-        raise NotImplementedError
+        Parameters
+        ----------
+        t : float
+            the current time
+        """
+        print('enters at t=', t)
+        call_counter[0] += 1
+        self.call_counter = call_counter
+        # convert from numpy scalar to float
+        t = t.tolist()
+
+        for ii in range(self.n):
+            # skip offline devices
+            if self.u.v[ii] == 0:
+                continue
+
+            # check mode
+            if self.SW.s2[ii] != 1:  # Mode 2: Interpolated
+                # If enters, then self.SW.s2[ii] != 1. So, mode not equal to 2
+                continue
+            
+            print('passes check at t=', t)
+
+            idx = self.idx.v[ii]
+            df = self._data[idx]
+            tkey = self.tkey.v[ii]
+            
+            # Get the nearest lower and upper time stamps
+            lower_time_idx = df[tkey].searchsorted(t, side='right') - 1
+            if lower_time_idx < 0:
+                continue  # Skip if currrent simulation time is before the first timestamp in the data
+            
+            
+            upper_time_idx = lower_time_idx + 1
+            print('gets lower and upper at t=', t)
+            lower_time = df[tkey].iloc[lower_time_idx]
+            upper_time = df[tkey].iloc[upper_time_idx]
+
+            # Calculate interpolation factor
+            ifactor = (t - lower_time) / (upper_time - lower_time)
+
+            print('ifactor at t=', t)
+
+            fields = self.fields.v[ii]
+            dests = self.dests.v[ii]
+
+            model = self.model.v[ii]
+            dev_idx = self.dev.v[ii]
+
+            #Check if the upper time index is out of bounds
+            if upper_time_idx >= len(df[tkey]):
+                continue  
+
+            print('checks upper index at t=', t)
+
+            # Apply the value change using linear interpolation
+            for field, dest in zip(fields, dests):
+                lower_value = df.loc[df[tkey] == lower_time, field].values
+                if len(lower_value) == 0:
+                    continue
+                lower_value = lower_value[0]
+
+                upper_value = df.loc[df[tkey] == upper_time, field].values
+                if len(upper_value) == 0:
+                    continue
+                upper_value = upper_value[0]
+
+                interpolated_value = lower_value + ifactor * (upper_value - lower_value)
+                self.system.__dict__[model].set(dest, dev_idx, 'v', interpolated_value)
+
+                #self.value_int = interpolated_value
+            
+                #self.timeseriesvalue_int = Algeb(v_str = '0',
+                #                                 e_str = 'timeseriesvalue_int - value_int')
+                self.timeseriesvalues[t] = interpolated_value 
+
+                if not self.config.silent:
+                    tqdm.write("<TimeSeries %s> set %s=%g for %s.%s at t=%g" %
+                            (idx, dest, interpolated_value, model, dev_idx, t))
+                    
+                print('applies interpolation t=', t)
+                interpolation_counter[0] += 1 
+                self.interpolation_counter = interpolation_counter
+
+    
 
     def init(self, routine):
         """

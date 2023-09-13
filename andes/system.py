@@ -1916,7 +1916,9 @@ class System:
             instance.switch_action(self.dae.t)
 
         # TODO: generalize below for any models with timeseries data.
+        #ToDo: Find a better way than calling both functions
         self.TimeSeries.apply_exact(self.dae.t)
+        self.TimeSeries.apply_interpolate(self.dae.t)
 
     def _p_restore(self):
         """
