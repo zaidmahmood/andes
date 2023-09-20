@@ -181,7 +181,7 @@ class TimeSeriesModel(Model):
         # collect all time stamps
         out = list()
 
-        print('time = ', self.system.dae.t)
+        #print('time = ', self.system.dae.t)
 
         #For mode == 1 
         for ii in range(self.n):
@@ -200,7 +200,7 @@ class TimeSeriesModel(Model):
                 continue
         
             out.append(self.system.dae.t)
-
+        #print(out)
         return out
 
     def apply_exact(self, t):
@@ -245,7 +245,8 @@ class TimeSeriesModel(Model):
                 if len(value) == 0:
                     continue
                 value = value[0]
-                self.system.__dict__[model].set(dest, dev_idx, 'v', value)
+                #self.system.__dict__[model].set(dest, dev_idx, 'v', value)
+                self.system.__dict__[model].alter(dest, dev_idx, value)
 
                 if not self.config.silent:
                     tqdm.write("<TimeSeries %s> set %s=%g for %s.%s at t=%g" %
@@ -267,7 +268,7 @@ class TimeSeriesModel(Model):
         t : float
             the current time
         """
-        print('enters at t=', t)
+        #print('enters at t=', t)
         call_counter[0] += 1
         self.call_counter = call_counter
         # convert from numpy scalar to float
@@ -283,7 +284,7 @@ class TimeSeriesModel(Model):
                 # If enters, then self.SW.s2[ii] != 1. So, mode not equal to 2
                 continue
             
-            print('passes check at t=', t)
+        #    print('passes check at t=', t)
 
             idx = self.idx.v[ii]
             df = self._data[idx]
@@ -294,16 +295,16 @@ class TimeSeriesModel(Model):
             if lower_time_idx < 0:
                 continue  # Skip if currrent simulation time is before the first timestamp in the data
             
-            
+
             upper_time_idx = lower_time_idx + 1
-            print('gets lower and upper at t=', t)
+        #    print('gets lower and upper at t=', t)
             lower_time = df[tkey].iloc[lower_time_idx]
             upper_time = df[tkey].iloc[upper_time_idx]
 
             # Calculate interpolation factor
             ifactor = (t - lower_time) / (upper_time - lower_time)
 
-            print('ifactor at t=', t)
+        #    print('ifactor at t=', t)
 
             fields = self.fields.v[ii]
             dests = self.dests.v[ii]
@@ -315,7 +316,7 @@ class TimeSeriesModel(Model):
             if upper_time_idx >= len(df[tkey]):
                 continue  
 
-            print('checks upper index at t=', t)
+        #    print('checks upper index at t=', t)
 
             # Apply the value change using linear interpolation
             for field, dest in zip(fields, dests):
@@ -330,7 +331,8 @@ class TimeSeriesModel(Model):
                 upper_value = upper_value[0]
 
                 interpolated_value = lower_value + ifactor * (upper_value - lower_value)
-                self.system.__dict__[model].set(dest, dev_idx, 'v', interpolated_value)
+                #self.system.__dict__[model].set(dest, dev_idx, 'v', interpolated_value)
+                self.system.__dict__[model].alter(dest, dev_idx, interpolated_value)
 
                 #self.value_int = interpolated_value
             
@@ -342,7 +344,7 @@ class TimeSeriesModel(Model):
                     tqdm.write("<TimeSeries %s> set %s=%g for %s.%s at t=%g" %
                             (idx, dest, interpolated_value, model, dev_idx, t))
                     
-                print('applies interpolation t=', t)
+        #        print('applies interpolation t=', t)
                 interpolation_counter[0] += 1 
                 self.interpolation_counter = interpolation_counter
 
